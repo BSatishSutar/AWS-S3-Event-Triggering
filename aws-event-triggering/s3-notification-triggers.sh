@@ -2,20 +2,20 @@
 
 set -x
 
-# Store the AWS account ID in a variable
+# Storing the AWS account ID in a variable
 aws_account_id=$(aws sts get-caller-identity --query 'Account' --output text)
 
-# Print the AWS account ID from the variable
+# Printing the AWS account ID from the variable
 echo "AWS Account ID: $aws_account_id"
 
-# Set AWS region and bucket name
+# Setting AWS region, bucket name, lambda function, IAM role name and email address
 aws_region="us-east-1"
 bucket_name="abhishek-ultimate-bucket"
 lambda_func_name="s3-lambda-function"
 role_name="s3-lambda-sns"
 email_address="zyz@gmail.com"
 
-# Create IAM Role for the project
+# Creating IAM Role for the project, This IAM Role is created with all permissions given to: Lambda function - S3 Bucket - SNS Topic
 role_response=$(aws iam create-role --role-name s3-lambda-sns --assume-role-policy-document '{
   "Version": "2012-10-17",
   "Statement": [{
@@ -31,23 +31,23 @@ role_response=$(aws iam create-role --role-name s3-lambda-sns --assume-role-poli
   }]
 }')
 
-# Extract the role ARN from the JSON response and store it in a variable
+# Extract the role ARN from the JSON response and store it in a variable, here 'jq' is a JSON parser
 role_arn=$(echo "$role_response" | jq -r '.Role.Arn')
 
-# Print the role ARN
+# Printing the IAM role ARN that was created
 echo "Role ARN: $role_arn"
 
-# Attach Permissions to the Role
+# Attaching Permissions to the IAM Role
 aws iam attach-role-policy --role-name $role_name --policy-arn arn:aws:iam::aws:policy/AWSLambda_FullAccess
 aws iam attach-role-policy --role-name $role_name --policy-arn arn:aws:iam::aws:policy/AmazonSNSFullAccess
 
 # Create the S3 bucket and capture the output in a variable
 bucket_output=$(aws s3api create-bucket --bucket "$bucket_name" --region "$aws_region")
 
-# Print the output from the variable
+# Print the output from the variable i.e. printing the S3 bucket created
 echo "Bucket creation output: $bucket_output"
 
-# Upload a file to the bucket
+# Uploading/Copying a sample text file to the S3 bucket created above, this file is part of this repo
 aws s3 cp ./example_file.txt s3://"$bucket_name"/example_file.txt
 
 # Create a Zip file to upload Lambda Function
@@ -65,7 +65,7 @@ aws lambda create-function \
   --role "arn:aws:iam::$aws_account_id:role/$role_name" \
   --zip-file "fileb://./s3-lambda-function.zip"
 
-# Add Permissions to S3 Bucket to invoke Lambda
+# Adding Permissions to S3 Bucket to invoke Lambda function
 aws lambda add-permission \
   --function-name "$lambda_func_name" \
   --statement-id "s3-lambda-sns" \
@@ -73,7 +73,7 @@ aws lambda add-permission \
   --principal s3.amazonaws.com \
   --source-arn "arn:aws:s3:::$bucket_name"
 
-# Create an S3 event trigger for the Lambda function
+# Create an S3 event to trigger the Lambda function
 LambdaFunctionArn="arn:aws:lambda:us-east-1:$aws_account_id:function:s3-lambda-function"
 aws s3api put-bucket-notification-configuration \
   --region "$aws_region" \
@@ -85,16 +85,16 @@ aws s3api put-bucket-notification-configuration \
     }]
 }'
 
-# Create an SNS topic and save the topic ARN to a variable
+# Creating an SNS topic and saving the topic ARN into a variable
 topic_arn=$(aws sns create-topic --name s3-lambda-sns --output json | jq -r '.TopicArn')
 
-# Print the TopicArn
+# Printing the TopicArn
 echo "SNS Topic ARN: $topic_arn"
 
 # Trigger SNS Topic using Lambda Function
 
 
-# Add SNS publish permission to the Lambda Function
+# Adding SNS publish permission to the Lambda Function
 aws sns subscribe \
   --topic-arn "$topic_arn" \
   --protocol email \
